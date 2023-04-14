@@ -1,0 +1,55 @@
+//************************************************************************
+//
+// FILE:   motorDriver.h
+//
+// TITLE:  source file for implementing motor driver VNH7070AS
+//
+//
+//
+//************************************************************************
+#include"motorDriver.h"
+//*************************************************************************
+// Function: motorDriverInit
+// - initialize pwm module and pins needed for both motor driver, x and y direction
+//
+// Arguments:
+//
+//
+// return: none
+// Author: Will Nguyen
+// Date: April 13th, 2023
+// Modified: April 13th, 2023
+//************************************************************************
+void motorDriverInit()
+{
+    //ePWM1 for x direction
+    ePWM1init();
+
+    //ePWM2 for y direction
+    ePWM2init();
+
+    //GPIO for direction of x
+    GPIO_setMasterCore(GPIO_X_DIR_CCW, GPIO_CORE_CPU1);
+    GPIO_setMasterCore(GPIO_X_DIR_CW, GPIO_CORE_CPU1);
+
+    GPIO_setPinConfig(GPIO_66_GPIO66);
+    GPIO_setPinConfig(GPIO_131_GPIO131);
+
+    GPIO_setDirectionMode(GPIO_X_DIR_CCW, GPIO_DIR_MODE_OUT);
+    GPIO_setDirectionMode(GPIO_X_DIR_CW, GPIO_DIR_MODE_OUT);
+    //default CCW
+    CCW_DIR_X;
+
+    //GPIO for direction of y
+    GPIO_setMasterCore(GPIO_Y_DIR_CCW, GPIO_CORE_CPU1);
+    GPIO_setMasterCore(GPIO_Y_DIR_CW, GPIO_CORE_CPU1);
+
+    GPIO_setPinConfig(GPIO_63_GPIO63);
+    GPIO_setPinConfig(GPIO_64_GPIO64);
+
+    GPIO_setDirectionMode(GPIO_Y_DIR_CCW, GPIO_DIR_MODE_OUT);
+    GPIO_setDirectionMode(GPIO_Y_DIR_CW, GPIO_DIR_MODE_OUT);
+    //default CCW
+    CCW_DIR_Y;
+}
+
