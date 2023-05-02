@@ -9,11 +9,11 @@
 //************************************************************************
 #ifndef PIXYCAM2_H_
 #define PIXYCAM2_H_
-
 #include "F2837xD_device.h"
-#include "driverlib.h"
-#include "device.h"
 #include <stdio.h>
+//************************************************************************
+//PRE-DEFINE CONSTANT
+#define TOLERANCE 10
 //************************************************************************
 //PACKET INFORMATION
 #define SYNC_16_HI 174
@@ -40,15 +40,15 @@
 //SIGMAP VALUE
 #define SIGNATURE_1 C28X_BIT0
 #define SIGNATURE_2 C28X_BIT1
-#define SIGNATURE_3 0x04
+#define SIGNATURE_3 C28X_BIT2
 #define SIGNATURE_4 C28X_BIT3
 #define SIGNATURE_5 C28X_BIT4
 #define SIGNATURE_6 C28X_BIT5
 #define SIGNATURE_7 C28X_BIT6
 //************************************************************************
 //MIDDLE POINT OF THE PIXYCAM
-#define TARGET_X 158
-#define TARGET_Y 104
+#define TARGET_X 151
+#define TARGET_Y 203
 //************************************************************************
 //STRUCTURE
 typedef struct PIXY_CCC
@@ -89,7 +89,7 @@ void pixyInitialize(PIXY_CCC *blocks);
 // Date: April 11th, 2023
 // Modified: April 11th, 2023
 //************************************************************************
-int16 pixyTargetRequest(PIXY_CCC *blocks, unsigned char *test);
+int16 pixyTargetRequest(PIXY_CCC *blocks);
 
 //*************************************************************************
 // Function: pixyCamGetBlocks

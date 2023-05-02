@@ -9,7 +9,7 @@
 #ifndef CMDINTERPRETER_H_
 #define CMDINTERPRETER_H_
 /**************************************************************************************************/
-#include "usciSCI.h"
+#include "F2837xD_device.h"
 /**************************************************************************************************/
 #define     MAX_ARGS        20
 #define     CMD0            "1"
@@ -25,9 +25,8 @@
 //Structure
 typedef struct CMD{
     const char *name;
-    volatile int16 nArgs;
-    volatile unsigned char args[MAX_ARGS];
-    volatile int32 iVal;
+    int16 nArgs;
+    int16 args[MAX_ARGS];
 }CMD;
 //Enum of command index
 enum COMMAND_LIST_INDEX
@@ -35,9 +34,7 @@ enum COMMAND_LIST_INDEX
    INDEX_JOG, INDEX_BLOCK_DETECT,INDEX_HOME, NUM_COMMANDS
 };
 //Global Variable
-char errorStr[50];
-char successStr[50];
-unsigned char buffer[50];
+//extern char errorStr[50];
 /**************************************************************************************************/
 //Function Prototype
 /************************************************************************************
@@ -91,6 +88,6 @@ int16 validateCmd (CMD *cmdList, char *cmdName);
  * Date: April 14th, 2023
  * Modified: April 14th,2023
  ************************************************************************************/
-void cmdSelection(CMD *cmdList);
+void cmdSelection();
 
 #endif /* CMDINTERPRETER_H_ */

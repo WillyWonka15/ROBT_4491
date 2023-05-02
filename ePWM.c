@@ -10,7 +10,8 @@
 //
 //************************************************************************
 #include "ePWM.h"
-
+#include "driverlib.h"
+#include "device.h"
 //*************************************************************************
 // Function: ePWMinit()
 // - initialize the ePWM1 module, default at 0% DC
@@ -134,16 +135,20 @@ void ePWM2gpioInit()
 int16 ePWM1dutyCtl(int16 duty)
 {
     int16 ret;
+
     if (duty > SPEED_0)
     {
         //configure as up mode if speed is non 0
         EPwm1Regs.TBCTL.bit.CTRMODE = EPWM_COUNTER_MODE_UP;
         //turn off this functionality
-        EPwm1Regs.AQCTLA.bit.ZRO = 0;
+        EPwm1Regs.AQCTLA.bit.ZRO = 0x00;
+
+        EPwm1Regs.CMPA.bit.CMPA = duty * TIMER_PRD/100;
+        ret = duty;
     }
-    switch (duty)
+
+    else if (duty == SPEED_0)
     {
-    case SPEED_0:
         EPwm1Regs.CMPA.bit.CMPA = DUTY_0 * TIMER_PRD;
         //freeze any counter opperation
         EPwm1Regs.TBCTL.bit.CTRMODE = EPWM_COUNTER_MODE_STOP_FREEZE;
@@ -152,48 +157,9 @@ int16 ePWM1dutyCtl(int16 duty)
         //force o/p to low
         EPwm1Regs.AQCTLA.bit.ZRO = EPWM_AQ_OUTPUT_LOW_ZERO;
         ret = 0;
-        break;
-    case SPEED_10:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_10 * TIMER_PRD;
-        ret = 10;
-        break;
-    case SPEED_20:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_20 * TIMER_PRD;
-        ret = 20;
-        break;
-    case SPEED_30:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_30 * TIMER_PRD;
-        ret = 30;
-        break;
-    case SPEED_40:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_40 * TIMER_PRD;
-        ret = 40;
-        break;
-    case SPEED_50:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_50 * TIMER_PRD;
-        ret = 50;
-        break;
-    case SPEED_60:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_60 * TIMER_PRD;
-        ret = 60;
-        break;
-    case SPEED_70:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_70 * TIMER_PRD;
-        ret = 70;
-        break;
-    case SPEED_80:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_80 * TIMER_PRD;
-        ret = 80;
-        break;
-    case SPEED_90:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_90 * TIMER_PRD;
-        ret = 90;
-        break;
-    case SPEED_100:
-        EPwm1Regs.CMPA.bit.CMPA = DUTY_100 * TIMER_PRD;
-        ret = 100;
-        break;
+
     }
+
     return ret;
 }
 
@@ -213,16 +179,20 @@ int16 ePWM1dutyCtl(int16 duty)
 int16 ePWM2dutyCtl(int16 duty)
 {
     int16 ret;
+
     if (duty > SPEED_0)
     {
         //configure as up mode if speed is non 0
         EPwm2Regs.TBCTL.bit.CTRMODE = EPWM_COUNTER_MODE_UP;
         //turn off this functionality
         EPwm2Regs.AQCTLA.bit.ZRO = 0;
+
+        EPwm2Regs.CMPA.bit.CMPA = duty * TIMER_PRD/100;
+        ret = duty;
     }
-    switch (duty)
+
+    else if (duty == SPEED_0)
     {
-    case SPEED_0:
         EPwm2Regs.CMPA.bit.CMPA = DUTY_0 * TIMER_PRD;
         //freeze any counter opperation
         EPwm2Regs.TBCTL.bit.CTRMODE = EPWM_COUNTER_MODE_STOP_FREEZE;
@@ -231,47 +201,7 @@ int16 ePWM2dutyCtl(int16 duty)
         //force o/p to low
         EPwm2Regs.AQCTLA.bit.ZRO = EPWM_AQ_OUTPUT_LOW_ZERO;
         ret = 0;
-        break;
-    case SPEED_10:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_10 * TIMER_PRD;
-        ret = 10;
-        break;
-    case SPEED_20:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_20 * TIMER_PRD;
-        ret = 20;
-        break;
-    case SPEED_30:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_30 * TIMER_PRD;
-        ret = 30;
-        break;
-    case SPEED_40:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_40 * TIMER_PRD;
-        ret = 40;
-        break;
-    case SPEED_50:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_50 * TIMER_PRD;
-        ret = 50;
-        break;
-    case SPEED_60:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_60 * TIMER_PRD;
-        ret = 60;
-        break;
-    case SPEED_70:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_70 * TIMER_PRD;
-        ret = 70;
-        break;
-    case SPEED_80:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_80 * TIMER_PRD;
-        ret = 80;
-        break;
-    case SPEED_90:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_90 * TIMER_PRD;
-        ret = 90;
-        break;
-    case SPEED_100:
-        EPwm2Regs.CMPA.bit.CMPA = DUTY_100 * TIMER_PRD;
-        ret = 100;
-        break;
     }
+
     return ret;
 }

@@ -11,9 +11,9 @@
 #ifndef USCISCI_H_
 #define USCISCI_H_
 #include "F2837xD_device.h"
-#include <strings.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include<strings.h>
+#include<stdio.h>
+#include<stdlib.h>
 //************************************************************************
 //CLOCK RATE
 #define LSPCLK 25000000
@@ -40,6 +40,12 @@
 #define WORD_64 86
 #define MAX_BUF_SIZE 50
 #define DUMMY_BYTE 0x00
+//*************************************************************************
+//ANSI SEQUENCE TYPE
+#define CLEAR_SCREEN_SEQUENCE 0
+#define CURSOR_HOME_SEQUENCE 1
+#define CURSOR_BACKSPACE_SEQUENCE 2
+#define BACKSPACE_DELETE_SEQUENCE 3
 //************************************************************************
 //FUNCTION PROTOTYPE
 //*************************************************************************
@@ -122,5 +128,19 @@ unsigned char usciSCIgets(unsigned char *rxStr);
 // Modified: April 14th, 2023
 //*************************************************************************
 void sciFlushInputBuffer(void);
+
+//*************************************************************************
+// Function: ansiSeqExecute
+// - this function execute ANSI sequence base on user type input
+//
+// Arguments: int16 sequenceType
+//
+//
+// return: none
+// Author: Will Nguyen
+// Date: April 5th, 2023
+// Modified: April 5th, 2023
+//************************************************************************
+void ansiSeqExecute(int16 sequenceType);
 
 #endif /* USCISCI_H_ */

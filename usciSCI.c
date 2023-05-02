@@ -11,8 +11,6 @@
 #include "usciSCI.h"
 #include "driverlib.h"
 #include "device.h"
-
-unsigned char backSpaceSequence[15];
 //*************************************************************************
 // Function: sciInit
 // - initialize the SCIB module, 8 bit per transmission, 1 stop bit and 0 parity bit
@@ -119,7 +117,7 @@ void usciSCItxChar(unsigned char txChar)
 void usciSCItxStr(unsigned char *txByte)
 {
     int16 i =0;
-    while(txByte[i] != NULL)
+    while(txByte[i] != '\0')
     {
         usciSCItxChar(txByte[i]);
         i++;
@@ -145,17 +143,20 @@ unsigned char usciSCIgets(unsigned char *rxStr)
     int16 i = 0;
     unsigned char ret;
 
-    //ANSI escape sequence
-    sprintf(backSpaceSequence, "\x1B[0J");
-
     //while enter key is not being hit
-    while(ScibRegs.SCIRXBUF.bit.SAR != '0x0d')
+    while(ScibRegs.SCIRXBUF.bit.SAR != 0x0d)
     {
         //poll RX flag
         WAIT_FOR_SCI_RX;
 
+        //
+        if(i < 0 )
+        {
+            i = 0;
+        }
+
         //receive character
-        if(ScibRegs.SCIRXBUF.bit.SAR != '0x08')
+        if(ScibRegs.SCIRXBUF.bit.SAR != 0x08)
         {
             rxBuff[i] = ScibRegs.SCIRXBUF.bit.SAR;
             //echo chacter back
@@ -164,10 +165,11 @@ unsigned char usciSCIgets(unsigned char *rxStr)
             i++;
         }
         //if user enter back space
-        else
+        else if(ScibRegs.SCIRXBUF.bit.SAR == 0x08)
         {
             i--;
-            usciSCItxStr(backSpaceSequence);
+            ansiSeqExecute(CURSOR_BACKSPACE_SEQUENCE);
+            ansiSeqExecute(BACKSPACE_DELETE_SEQUENCE);
         }
     }
 
@@ -182,9 +184,13 @@ unsigned char usciSCIgets(unsigned char *rxStr)
         i--;
         //insert null char
         rxBuff[i] = '\0';
-        sprintf(rxStr, rxBuff);
+        strcpy(rxStr, rxBuff);
         ret = 0;
     }
+
+    //flush i/p buffer
+    sciFlushInputBuffer();
+
     return ret;
 }
 
@@ -216,4 +222,41 @@ void sciFlushInputBuffer(void)
 
     //disable loopback
     usciSCIBinit(DISABLE_LOOPBACK);
+}
+
+//*************************************************************************
+// Function: ansiSeqExecute
+// - this function execute ANSI sequence base on user type input
+//
+// Arguments: int16 sequenceType
+//
+//
+// return: none
+// Author: Will Nguyen
+// Date: April 5th, 2023
+// Modified: April 5th, 2023
+//************************************************************************
+void ansiSeqExecute(int16 sequenceType)
+{
+    volatile char ansiSequence[10];
+
+    switch (sequenceType)
+    {
+    case CLEAR_SCREEN_SEQUENCE:
+        sprintf(ansiSequence, "\x1B[2J");
+        usciSCItxStr(ansiSequence);
+        break;
+    case CURSOR_HOME_SEQUENCE:
+        sprintf(ansiSequence, "\x1B[H");
+        usciSCItxStr(ansiSequence);
+        break;
+    case CURSOR_BACKSPACE_SEQUENCE:
+        sprintf(ansiSequence, "\x1B[1D");
+        usciSCItxStr(ansiSequence);
+        break;
+    case BACKSPACE_DELETE_SEQUENCE:
+        sprintf(ansiSequence, "\x1B[0J");
+        usciSCItxStr(ansiSequence);
+        break;
+    }
 }

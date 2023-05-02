@@ -9,7 +9,8 @@
 //
 //************************************************************************
 #include "Timer0.h"
-
+#include "driverlib.h"
+#include "device.h"
 //*************************************************************************
 // Function: timer0Init
 // - initialize the timer0 to run at 60Hz

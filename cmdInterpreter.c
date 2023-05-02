@@ -7,6 +7,7 @@
  *  Modified: April 14th,2023
  *************************************************************************************************/
 #include "cmdInterpreter.h"
+#include "usciSCI.h"
 /************************************************************************************
  * Function: cmdInitialize
  * - receive an array of type CMD to initialize
@@ -67,8 +68,6 @@ int16 parseCmd(CMD *cmdList, char *cmdLine)
     char *pEnd = NULL;
     int16 idx, temp;
     int16 i = 0;
-    //unsigned char test[100];
-    unsigned char *pTr;
 
     //tokenize cmd name
     tok = strtok(cmdLine, seps);
@@ -76,7 +75,7 @@ int16 parseCmd(CMD *cmdList, char *cmdLine)
     //if not command name received
     if (tok == NULL)
     {
-        sprintf(errorStr, "enter something duh\r\n");
+        //sprintf(errorStr, "enter something duh\r\n");
         return -1;
     }
 
@@ -84,7 +83,7 @@ int16 parseCmd(CMD *cmdList, char *cmdLine)
     idx = validateCmd(cmdList, tok);
     if (idx == -1)
     {
-        sprintf(errorStr, "Wrong command name, try again nerd\r\n");
+        //sprintf(errorStr, "Wrong command name, try again nerd\r\n");
         return -1;
     }
 
@@ -95,7 +94,7 @@ int16 parseCmd(CMD *cmdList, char *cmdLine)
             if (tok != NULL)
             {
                 temp = i;
-                cmdList[idx].args[i] = *tok;
+                cmdList[idx].args[i] = strtol(tok, &pEnd, 10);
                 i = temp + 1;
             }
         }
@@ -104,7 +103,7 @@ int16 parseCmd(CMD *cmdList, char *cmdLine)
     //validate command nArgs
     if (cmdList[idx].nArgs != i)
     {
-        sprintf(errorStr, "Too many arguments, try again\r\n");
+        //sprintf(errorStr, "Too many arguments, try again\r\n");
         return -1;
     }
     return idx;
@@ -155,10 +154,15 @@ int16 validateCmd(CMD *cmdList, char *cmdName)
 void cmdSelection()
 {
     //local var
-    unsigned char txBuf[70];
+    unsigned char txBuf[100];
 
-    //
+    //commands selection
     sprintf(txBuf, "Please select one of the command\r\n 1.Jogging (int16 speed)\r\n 2.Auto Block Detection\r\n 3.Home\r\n");
+
+    //clear screen to begin running
+    ansiSeqExecute(CLEAR_SCREEN_SEQUENCE);
+
+    ansiSeqExecute(CURSOR_HOME_SEQUENCE);
 
     usciSCItxStr(txBuf);
 }

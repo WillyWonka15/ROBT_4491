@@ -11,9 +11,6 @@
 #define TIMER1_H_
 
 #include "F2837xD_device.h"
-#include "driverlib.h"
-#include "device.h"
-
 //************************************************************************
 //PRE-DEFINE CONSTANT
 #define ENABLE_INTERRUPT 1
@@ -21,10 +18,12 @@
 //************************************************************************
 //TIME0 FREQUENCY
 #define SYS_CLK_FREQ 100000000
-#define T1_FREQ 40
+#define T1_FREQ 30
 //************************************************************************
 //MACROS
 #define CLEAR_T1_INT_FLAG CpuTimer1Regs.TCR.bit.TIF = 1
+#define ENABLE_INTERRUPT_T1 CpuTimer1Regs.TCR.bit.TIE = 1
+#define DISABLE_INTERRUPT_T1 CpuTimer1Regs.TCR.bit.TIE = 0
 //************************************************************************
 //FUNCTION PROTOTYPE
 //*************************************************************************

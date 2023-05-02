@@ -13,8 +13,6 @@
 #define EPWM_H_
 
 #include "F2837xD_device.h"
-#include "driverlib.h"
-#include "device.h"
 //************************************************************************
 //PRE-DEFINE CONSTANT
 #define INITIALIZE_COUNT 0

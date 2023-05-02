@@ -10,10 +10,7 @@
 //************************************************************************
 #ifndef USCISPI_H_
 #define USCISPI_H_
-
 #include "F2837xD_device.h"
-#include "driverlib.h"
-#include "device.h"
 //************************************************************************
 //SPI CONFIGURATION
 #define CHARACTER_LENGTH_8 0x7

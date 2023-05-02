@@ -9,7 +9,8 @@
 //
 //************************************************************************
 #include "usciSPI.h"
-
+#include "driverlib.h"
+#include "device.h"
 //*************************************************************************
 // Function: usciSPIinit
 // - initialize the SPI module as full duplex

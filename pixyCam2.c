@@ -9,7 +9,8 @@
 //************************************************************************
 #include "pixyCam2.h"
 #include "usciSPI.h"
-
+#include "driverlib.h"
+#include "device.h"
 //GLOBAL VARIABLE AVAILABLE ONLY IN THIS .c module
 const unsigned char cccRequestPacket[REQ_PACKET_LEN] = { SYNC_16_HI, SYNC_16_LO,
 PACKET_TYPE,
@@ -49,7 +50,7 @@ void pixyInitialize(PIXY_CCC *blocks)
 // Date: April 11th, 2023
 // Modified: April 11th, 2023
 //************************************************************************
-int16 pixyTargetRequest(PIXY_CCC *blocks, unsigned char *test)
+int16 pixyTargetRequest(PIXY_CCC *blocks)
 {
     unsigned char resPacket[RES_PACKET_LEN];
     int16 ret;
@@ -63,16 +64,9 @@ int16 pixyTargetRequest(PIXY_CCC *blocks, unsigned char *test)
     //receive the packet via SPI
     usciSPIrxStr(resPacket, RES_PACKET_LEN);
 
-    strcpy(test, resPacket);
-
     //store data into struct, make into a function
     if ((int16)resPacket[PAYLOAD_LEN_INDEX] == RES_PAYLOAD_LEN)
     {
-        /*temp = &blocks->m_x;
-        *temp = resPacket[M_X_INDEX_LO];
-        temp ++;
-        *temp = resPacket[M_X_INDEX_HI];*/
-
         blocks->m_x = resPacket[M_X_INDEX_HI] << 8 | resPacket[M_X_INDEX_LO];
 
         blocks->m_y = resPacket[M_Y_INDEX_LO];
@@ -116,8 +110,8 @@ int16 pixyCamGetBlocks(PIXY_CCC *blocks, int numBlock)
     unsigned char reqPacket[REQ_PACKET_LEN] = { SYNC_16_HI, SYNC_16_LO,
     PACKET_TYPE,
                                                 PAYLOAD_LEN,
-                                                SIGNATURE_3,
-                                                SINGLE_BLOCK_RETURN, 0, 0, 0, 0,
+                                                blocks->signature,
+                                                numBlock, 0, 0, 0, 0,
                                                 0, 0, 0 };
     //array to store respond
     unsigned char resPacket[RES_PACKET_LEN];
@@ -128,22 +122,18 @@ int16 pixyCamGetBlocks(PIXY_CCC *blocks, int numBlock)
     //receive the packet via SPI
     usciSPIrxStr(resPacket, RES_PACKET_LEN);
 
-    //if the index is the same then store value
-    if ((int16) resPacket[SIG_INDEX] == blocks->signature)
+    //if the signature is the same and the track index match
+    if ((int16) resPacket[SIG_INDEX] == blocks->signature && (int16)resPacket[TRACKING_INDEX] == blocks->trackIndex)
     {
         ret = 0;
         blocks->m_x = (int16) resPacket[M_X_INDEX_HI] << 8
                 | resPacket[M_X_INDEX_LO];
 
-        /*temp--;
-         *temp = resPacket[M_Y_INDEX_LO];
-         temp++;
-         *temp = resPacket[M_Y_INDEX_HI];*/
         blocks->m_y = (int16) resPacket[M_Y_INDEX_LO];
 
-        blocks->trackIndex = resPacket[TRACKING_INDEX];
+        //blocks->trackIndex = resPacket[TRACKING_INDEX];
         blocks->frame = resPacket[FRAME_INDEX];
-        blocks->signature = resPacket[SIG_INDEX];
+        //blocks->signature = resPacket[SIG_INDEX];
 
         ret = 0;
     }
