@@ -11,18 +11,14 @@
 #ifndef ENCODERDATACAPTURE_H_
 #define ENCODERDATACAPTURE_H_
 
-#include <stdint.h>
 #include "F2837xD_device.h"
-#include "driverlib.h"
-#include "device.h"
-#include <math.h>
 //************************************************************************
 //SYS_CLK
 #define SYS_CLK 100000000U
 #define SYS_CLK_PERIOD 1/SYS_CLK
 //************************************************************************
 //DESIRE SAMPLING FREQUENCY
-#define SAMPLING_FREQ 240U
+#define SAMPLING_FREQ 100U
 #define SAMPLING_PERIOD 1/SAMPLING_FREQ
 //************************************************************************
 //TIMING SETTING FOR DATA GATHERING
@@ -48,6 +44,8 @@
 //PRE-DEFINE CONSTANT
 #define PI 3.1416
 #define FREQ 120U
+#define LEAD_SCREW 0.125
+#define MAX_COUNT 4294967295
 //************************************************************************
 //eQEP pin-out
 #define EQEP1_GPIO_A 10
@@ -56,39 +54,37 @@
 //STRUCTURE
 typedef struct ENC_DAT
 {
-     volatile int32 posCurr; //store current count
-     volatile int32 posPrev; //store previous count
+     volatile float64 posCurr; //store current count
      volatile int32 posCnt;  //store the count elapse over every Ttout
      volatile int16 dir; //store direction of flywheel
 }ENC_DAT;
 
 enum ENC_LIST_INDEX
 {
-    INDEX_ENCODER_1, INDEX_ENCODER_2, NUM_ENCODER
+    INDEX_ENCODER_X, INDEX_ENCODER_Y, NUM_ENCODER
 };
-
 //GLOBAL VAR
 //volatile unsigned char babyItsReady; bring this to the client you wish to use it in
 //************************************************************************
 //FUNCTION PROTOTYPE
 //*************************************************************************
 // Function: eQEP1init
-// -initialize the eQEP1 module for measuring speed of a DC motor by Pulse Accumulation
-// Arguments: int16_t enableInt
+// - initialize the eQEP1 module for measuring the count of an encoder per unit time
+// out interval, eQEP1 is dedicate for x-axis motor
 //
-// user choice to enable velocity measurement functionality
+// Arguments: int16_t enableInt
 //
 // return: none
 // Author: Will Nguyen
 // Date: Mar 18th, 2023
 // Modified: Mar 18th, 2023
-//*************************************************************************
+//************************************************************************
 void eQEP1init(int16 enableInt);
 
 //*************************************************************************
 // Function: encoderDataInit
-// -initialize ENC_DAT struct
-// Arguments: ENC_DAT *encoder
+// -initialize ENC_DAT and COORD structure
+// Arguments: ENC_DAT *encoder COORD *coord
 //
 //
 // return: none
@@ -101,6 +97,8 @@ void encoderDataInit(ENC_DAT *encoder);
 //*************************************************************************
 // Function: eQEP1GPIOinit
 // - initialize GPIO pin for eQEP1 module
+// GPIO 10 is dedicate for channel A
+// GPIO 11 is dedicate for channel B
 // Arguments:none
 //
 // return: none
@@ -111,20 +109,11 @@ void encoderDataInit(ENC_DAT *encoder);
 void eQEP1GPIOinit(void);
 
 //*************************************************************************
-// Function: eQEP1velocityMeasInit
-// - initialize the eQEP1 fucntion to measure velocity
-// Arguments:
-//
-// return: none
-// Author: Will Nguyen
-// Date: Mar 18th, 2023
-// Modified: Mar 18th, 2023
-//*************************************************************************
-void eQEP1velocityMeasInit(void);
-
-//*************************************************************************
 // Function: eQEP1initInit
 // - initialize the interrupt for eQEP1
+//  unit time out interrupt
+//  position counter overflow interrupt
+//  position counter underflow interrupt
 // Arguments:
 //
 // return: none
@@ -133,30 +122,6 @@ void eQEP1velocityMeasInit(void);
 // Modified: Mar 18th, 2023
 //*************************************************************************
 void eQEP1intInit(void);
-
-//*************************************************************************
-// Function: eQEP1getPos
-// - this function get read acquired position from counter
-// Arguments:
-//
-// return: the read position
-// Author: Will Nguyen
-// Date: Mar 19th, 2023
-// Modified: Mar 19th, 2023
-//*************************************************************************
-Uint32 eQEP1getPos(void);
-
-//*************************************************************************
-// Function: eQEP1getPos
-// - this function calculating speed from accumulated position count
-// Arguments:
-//
-// return: the measured speed
-// Author: Will Nguyen
-// Date: Mar 30th, 2023
-// Modified: Mar 30th, 2023
-//*************************************************************************
-float32 eQEP1speedCalc(int32 pos);
 
 //*************************************************************************
 // Function: eQEP1ISR
