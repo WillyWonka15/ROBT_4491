@@ -31,14 +31,14 @@ int16 executeCmd(CMD *cmdList, int16 idx)
 
     //auto block detection
     int16 err;
-    int16 temp;
+    int16 temp = 0;
     PIXY_CCC blocks;
+
+    //flush i/p buffer before doing any command
+    sciFlushInputBuffer();
 
     //jogging
     unsigned char userGuide[250];
-
-    //testing
-    volatile unsigned char test[50];
 
     //initialize struct PIXY_CCC
     pixyInitialize(&blocks);
@@ -51,11 +51,6 @@ int16 executeCmd(CMD *cmdList, int16 idx)
     switch (idx)
     {
     case INDEX_JOG:
-        //enable the EQEP for tracking postion
-        DINT;
-        eQEP1init(ENABLE_INTERRUPT);
-        EINT;
-
         //print user manual
         sprintf(userGuide,
                 "Up arrow for forward y direction\r\nDown arrow for reverse y direction\r\nS key to stop moving in y direction\r\n\r\nLeft arrow for forward x direction\r\nRight arrow for reverse x direction\r\nA key to stop moving in x direction");
@@ -117,93 +112,85 @@ int16 executeCmd(CMD *cmdList, int16 idx)
         ePWM1dutyCtl(SPEED_0);
         ePWM2dutyCtl(SPEED_0);
 
-        //disable the EQEP for tracking position
-        DINT;
-        eQEP1init(DISABLE_INTERRUPT);
-        EINT;
-
         //
         ret = 0;
 
         break;
 
     case INDEX_BLOCK_DETECT:
-        //enable the EQEP for tracking position
+        //enable timer 1 interrupt
         DINT;
-        eQEP1init(ENABLE_INTERRUPT);
+        ENABLE_INTERRUPT_T1;
         EINT;
 
         //while enter key is not being hit
         while (ScibRegs.SCIRXBUF.bit.SAR != 0x0d)
         {
-            if (babyItsReady & T1_INT)
+            //move to position to see block
+            temp = cartesianCoordMove(USER_HOME_X, USER_HOME_Y, ERROR_05);
+
+            if (temp == 1)
             {
-                //disable timer interrupt for un-interrupted sequence
-                DISABLE_INTERRUPT_T1;
-
-                //turn flag off
-                babyItsReady &= ~T1_INT;
-                //get block data
-                err = pixyTargetRequest(&blocks);
-                //if return value valid, call auto block detection
-                if (err == 0)
+                while (temp == 1)
                 {
-                    temp = autoBlockDetection(&blocks);
-
-                    //test loop simulate block is picked, change to another sequential sequence later
-                    if (temp == 1)
+                    if (babyItsReady & T1_INT)
                     {
-                        for (;;)
-                            ;
-                    }
+                        //disable timer interrupt for un-interrupted sequence
+                        DINT;
+                        DISABLE_INTERRUPT_T1;
+                        EINT;
 
-                    else if (temp == 0)
-                    {
-                        ret = -1;
-                        break;
+                        //turn flag off
+                        babyItsReady &= ~T1_INT;
+
+                        //get block data
+                        err = pixyTargetRequest(&blocks);
+
+                        //if return value valid, call auto block detection
+                        if (err == 0)
+                        {
+                            temp = autoBlockDetection(&blocks);
+
+                            //TCP is line up with the block center x and y
+                            if (temp == 1)
+                            {
+
+                                blockSorting(&blocks);
+                                temp = 0;
+                            }
+
+                            /*else if (temp == 0)
+                             {
+                             ret = -1;
+                             break;
+                             }*/
+                        }
+                        //
+                        DINT;
+                        ENABLE_INTERRUPT_T1;
+                        EINT;
+
                     }
                 }
-
-                //
-                ENABLE_INTERRUPT_T1;
             }
-
-            //disable timer again
-            DISABLE_INTERRUPT_T1;
         }
-
-        //disable the EQEP for tracking position
-        DINT;
-        eQEP1init(DISABLE_INTERRUPT);
-        EINT;
-
         break;
 
     case INDEX_HOME:
-        //turn flag off from bouncing
-        babyItsReady &= ~(X_HOME_FLAG | Y_HOME_FLAG);
-
-        //
-        EALLOW;
-        GPIO_enableInterrupt(GPIO_INT_XINT1);
-        GPIO_enableInterrupt(GPIO_INT_XINT2);
-        EDIS;
 
         cartesianHome();
 
         //reset the position and certain flag after home
-        babyItsReady &= ~UNDERFLOW;
-        encoderDataInit(encoderData);
-        //
+        babyItsReady &= ~(EQEP1_UNDERFLOW | EQEP3_UNDERFLOW);
+
+        //zero encoder count
         DINT;
-        eQEP1init(DISABLE_INTERRUPT);
+        eQEP1init(ENABLE_INTERRUPT);
+        eQEP3init(ENABLE_INTERRUPT);
         EINT;
 
-        //
-        EALLOW;
-        GPIO_disableInterrupt(GPIO_INT_XINT1);
-        GPIO_disableInterrupt(GPIO_INT_XINT2);
-        EDIS;
+        encoderDataInit(encoderData);
+
 
         ret = 0;
 
@@ -216,6 +203,11 @@ int16 executeCmd(CMD *cmdList, int16 idx)
     //turn off speed if not execute any command, extra protection
     ePWM1dutyCtl(SPEED_0);
     ePWM2dutyCtl(SPEED_0);
+
+    //disable timer T1
+    DINT;
+    DISABLE_INTERRUPT_T1;
+    EINT;
 
     return ret;
 }
@@ -234,106 +226,206 @@ int16 executeCmd(CMD *cmdList, int16 idx)
 //************************************************************************
 int16 autoBlockDetection(PIXY_CCC *blocks)
 {
+    //reset flag use in this section
+    babyItsReady &= ~(T1_INT | DINNER);
+
     //local var
     int16 err;
-    int16 temp;
-    static unsigned char transmitBuffer[50];
+    unsigned char transmitBuffer[50];
     int16 ret = 0;
-    int16 currSpeedX;
-    int16 currSpeedY;
+    float32 aConstant = 0;
+    float32 convertRatX = 0.025146;
+    float32 convertRatY = 0.035274;
 
-    //
+    //reset past speed
+    encoderData[INDEX_ENCODER_X].pastSpeed = 100;
+    encoderData[INDEX_ENCODER_Y].pastSpeed = 100;
+
+    //calculate distance x and y in in related to the TCP
+    encoderData[INDEX_ENCODER_X].displacement = convertRatX
+            * (blocks->m_x - TARGET_X);
+
+    encoderData[INDEX_ENCODER_Y].displacement = convertRatY
+            * (blocks->m_y - TARGET_Y);
+
+    //calculate desire TCP position related to the home postion
+    encoderData[INDEX_ENCODER_X].posDesire =
+            encoderData[INDEX_ENCODER_X].displacement
+                    + encoderData[INDEX_ENCODER_X].posCurr;
+    encoderData[INDEX_ENCODER_Y].posDesire =
+            encoderData[INDEX_ENCODER_Y].displacement
+                    + encoderData[INDEX_ENCODER_Y].posCurr;
+
+    //enable T1 interrupt again to track the block
+    DINT;
     ENABLE_INTERRUPT_T1;
+    EINT;
 
-    //
-    EALLOW;
-    GPIO_enableInterrupt(GPIO_INT_XINT1);
-    GPIO_enableInterrupt(GPIO_INT_XINT2);
-    EDIS;
-
-    //
     while (1)
     {
         if (babyItsReady & T1_INT)
         {
             //disable timer interrupt for un-interrupted sequence
+            DINT;
             DISABLE_INTERRUPT_T1;
+            EINT;
 
             //clear flag
             babyItsReady &= ~T1_INT;
 
+            aConstant += 0.05;
+
             //get block
             err = pixyCamGetBlocks(blocks, 1);
 
-            //if there is no data
-            if (err == -1)
+            if (err == 0)
             {
-                temp++; //track number of time the pixy give back bad data
-            }
+                //calculate distance x and y in related to the TCP
+                encoderData[INDEX_ENCODER_X].displacement = convertRatX
+                        * (blocks->m_x - TARGET_X);
 
-            else if (err == 0)
-            {
-                //control speed base on gathered data
-                ret = controllerPID(blocks);
+                encoderData[INDEX_ENCODER_Y].displacement = convertRatY
+                        * (blocks->m_y - TARGET_Y);
+
+                //calculate desire TCP position related to the home postion
+                encoderData[INDEX_ENCODER_X].posDesire =
+                        encoderData[INDEX_ENCODER_X].displacement
+                                + encoderData[INDEX_ENCODER_X].posCurr;
+                encoderData[INDEX_ENCODER_Y].posDesire =
+                        encoderData[INDEX_ENCODER_Y].displacement
+                                + encoderData[INDEX_ENCODER_Y].posCurr;
 
                 //displaying real time position
-                sprintf(transmitBuffer, "x: [%4d] y: [%4d] signature: [%4d]\r",
-                        blocks->m_x, blocks->m_y, blocks->signature);
+                //sprintf(transmitBuffer, "x: [%4d] y: [%4d]\r", blocks->m_x,blocks->m_y);
 
-                usciSCItxStr(transmitBuffer);
-
-                //break if on the target
-                if (ret == 1)
-                {
-                    break;
-                }
+                //usciSCItxStr(transmitBuffer);
             }
 
             //enable T1 interrupt again after done 1 sequence
+            DINT;
             ENABLE_INTERRUPT_T1;
+            EINT;
         }
 
-        //if triped limit switch
-        else if (babyItsReady & X_HOME_FLAG)
+        if (babyItsReady & DINNER)
         {
-            //turn off flag
-            babyItsReady &= ~X_HOME_FLAG;
+            //
+            babyItsReady &= ~DINNER;
 
-            //turn off motor
-            currSpeedX = ePWM1dutyCtl(SPEED_0);
-            if (currSpeedY == SPEED_0)
+            //calculate current postion related to home every 100Hz period
+            encoderData[INDEX_ENCODER_X].posCurr =
+                    LEAD_SCREW
+                            * encoderData[INDEX_ENCODER_X].posCnt/ ENCODER_MAX_COUNT_QUAD;
+
+            encoderData[INDEX_ENCODER_Y].posCurr =
+                    LEAD_SCREW
+                            * encoderData[INDEX_ENCODER_Y].posCnt/ ENCODER_MAX_COUNT_QUAD;
+
+            //control speed base on gathered data
+            ret = controllerPID(ERROR_0125,aConstant);
+
+            //break if on the target
+            if (ret == 1)
             {
-                ret = 0;
                 break;
             }
-
         }
-        else if (babyItsReady & Y_HOME_FLAG)
+
+    }
+
+    //
+    DINT;
+    DISABLE_INTERRUPT_T1;
+    EINT;
+
+    return ret;
+}
+
+//*************************************************************************
+// Function: cartesianCoordMove
+// - this function move the arm to a set position
+//
+// Arguments: float32 xCoord, float32 yCoord, float32 error
+//
+// \e xCoord and yCoord is the real X and Y coordinate in inches user want TCP to be at
+// \e error is the amount of accpetable error in the move
+//
+// return: 1 if at the postion
+// Author: Will Nguyen
+// Date: April 25th, 2023
+// Modified: May 4th, 2023
+//************************************************************************
+int16 cartesianCoordMove(float32 xCoord, float32 yCoord, float32 error)
+{
+    //reset flag use in this section
+    babyItsReady &= ~(T1_INT | DINNER);
+
+    //local var
+    int16 ret = 0;
+
+    //
+    float32 aConstant = 0;
+
+    //reset past speed
+    encoderData[INDEX_ENCODER_X].pastSpeed = 100;
+    encoderData[INDEX_ENCODER_Y].pastSpeed = 100;
+
+    //calculate desire TCP position related to the home postion
+    encoderData[INDEX_ENCODER_X].posDesire = xCoord;
+
+    encoderData[INDEX_ENCODER_Y].posDesire = yCoord;
+
+    //calculate distance x and y in in related to the TCP
+    encoderData[INDEX_ENCODER_X].displacement =
+            encoderData[INDEX_ENCODER_X].posDesire
+                    - encoderData[INDEX_ENCODER_X].posCurr;
+
+    encoderData[INDEX_ENCODER_Y].displacement =
+            encoderData[INDEX_ENCODER_Y].posDesire
+                    - encoderData[INDEX_ENCODER_Y].posCurr;
+
+    while (1)
+    {
+        if (babyItsReady & T1_INT)
         {
-            //turn off flag
-            babyItsReady &= ~Y_HOME_FLAG;
+            //turn flag off
+            babyItsReady &= ~T1_INT;
 
-            //switch de-bounce
+            aConstant += 0.05;
 
-            //turn off motor
-            currSpeedY = ePWM2dutyCtl(SPEED_0);
-            if (currSpeedX == SPEED_0)
+            encoderData[INDEX_ENCODER_X].displacement =
+                    encoderData[INDEX_ENCODER_X].posDesire
+                            - encoderData[INDEX_ENCODER_X].posCurr;
+
+            encoderData[INDEX_ENCODER_Y].displacement =
+                    encoderData[INDEX_ENCODER_Y].posDesire
+                            - encoderData[INDEX_ENCODER_Y].posCurr;
+        }
+
+        if (babyItsReady & DINNER)
+        {
+            //
+            babyItsReady &= ~DINNER;
+
+            //calculate current postion related to home every 100Hz period
+            encoderData[INDEX_ENCODER_X].posCurr =
+                    LEAD_SCREW
+                            * encoderData[INDEX_ENCODER_X].posCnt/ ENCODER_MAX_COUNT_QUAD;
+
+            encoderData[INDEX_ENCODER_Y].posCurr =
+                    LEAD_SCREW
+                            * encoderData[INDEX_ENCODER_Y].posCnt/ ENCODER_MAX_COUNT_QUAD;
+
+            //control speed base on gathered data
+            ret = controllerPID(error, aConstant);
+
+            //break if on the target
+            if (ret == 1)
             {
-                ret = 0;
                 break;
             }
         }
     }
-
-    //
-    DISABLE_INTERRUPT_T1;
-
-    //
-    EALLOW;
-    GPIO_disableInterrupt(GPIO_INT_XINT1);
-    GPIO_disableInterrupt(GPIO_INT_XINT2);
-    EDIS;
-
     return ret;
 }
 
@@ -341,104 +433,157 @@ int16 autoBlockDetection(PIXY_CCC *blocks)
 // Function: controllerPID
 // - this function implement PI controller
 //
-// Arguments: PIXY_CCC *blocks
+// Arguments: float32 error
+// \e error is the square of acceptable error in inches
 //
 //
-// return: none
+// return: 1 if at the desire location
 // Author: Will Nguyen
 // Date: April 28th, 2023
 // Modified: April 28th, 2023
 //************************************************************************
-int16 controllerPID(PIXY_CCC *blocks)
+int16 controllerPID(float32 error, float32 a)
 {
-    static float eiX = 0;
-    static float eiY = 0;
-    static float P_x = 0;
-    static float P_y = 0;
-    static float I_x = 0;
-    static float I_y = 0;
-    static float TF_x = 0;
-    static float TF_y = 0;
+    static float32 eiX = 0;
+    static float32 eiY = 0;
+    static float32 I_x = 0;
+    static float32 I_y = 0;
+    float32 TF_x = 0;
+    float32 TF_y = 0;
 
-    int16 retX;
-    int16 retY;
     int16 ret = 0;
 
-    //P
-    float eX = TARGET_X - blocks->m_x;
-    float eY = TARGET_Y - blocks->m_y;
-    P_x = abs(eX) * 100 / TARGET_X;
-    P_y = abs(eY) * 100 / TARGET_Y;
+    if(a > 1)
+    {
+        a = 1;
+    }
+
+    //determine direction and P
+    float32 eX = encoderData[INDEX_ENCODER_X].posDesire
+            - encoderData[INDEX_ENCODER_X].posCurr;
+
+    float32 eY = encoderData[INDEX_ENCODER_Y].posDesire
+            - encoderData[INDEX_ENCODER_Y].posCurr;
+
+    int32 P_x = abs(eX * a * 100 / encoderData[INDEX_ENCODER_X].displacement);
+    int32 P_y = abs(eY * a *  100 / encoderData[INDEX_ENCODER_Y].displacement);
 
     //I
-    eiX += eX;
-    eiY += eY;
+    eiX += eX*eX;
+    eiY += eY*eY;
     I_x = I_CONTROLLER_X * eiX;
     I_y = I_CONTROLLER_Y * eiY;
 
     //transfer function
     TF_x = P_x + I_x;
-    TF_y = P_y + I_y;
-
-    //direction
-    if (eX > 0)
+    TF_y = P_y + I_x;
+    //stop if on the target, maybe using displacement is too slow
+    if ((eX * eX < error) && (eY * eY < error))
     {
-        HOME_DIR_X
-        ;
-    }
-    else if (eX < 0)
-    {
-        FORWARD_DIR_X
-        ;
-    }
-
-    if (eY > 0)
-    {
-        HOME_DIR_Y
-        ;
-    }
-    else if (eY < 0)
-    {
-        FORWARD_DIR_Y
-        ;
-    }
-
-    //clamp speed
-    if (TF_x > 50)
-    {
-        TF_x = 100;
-    }
-    else if (TF_x < 40 && TF_x > 5)
-    {
-        TF_x = 40;
-    }
-    else if (TF_x < 5)
-    {
-        TF_x = 10;
-    }
-
-    if (TF_y > 50)
-    {
-        TF_y = 100;
-    }
-    else if (TF_y < 40 && TF_y > 5)
-    {
-        TF_y = 50;
-    }
-    else if (TF_y < 5)
-    {
-        TF_y = 10;
-    }
-
-    //drive motor
-    retX = ePWM1dutyCtl(TF_x);
-    retY = ePWM2dutyCtl(TF_y);
-
-    //stop if on the target
-    if (abs(retX) < 2 && abs(retY) < 2)
-    {
+        ePWM1dutyCtl(SPEED_0);
+        ePWM2dutyCtl(SPEED_0);
         ret = 1;
+        return ret;
     }
+
+    else
+    {
+        //direction control
+        if (eX > 0)
+        {
+            FORWARD_DIR_X
+            ;
+        }
+        else if (eX < 0)
+        {
+            HOME_DIR_X
+            ;
+        }
+
+        if (eY > 0)
+        {
+            FORWARD_DIR_Y
+            ;
+        }
+        else if (eY < 0)
+        {
+            HOME_DIR_Y
+            ;
+        }
+
+        //filter any jump of error
+
+        /*if (TF_x > encoderData[INDEX_ENCODER_X].pastSpeed)
+        {
+            TF_x = encoderData[INDEX_ENCODER_X].pastSpeed;
+        }
+        if (TF_y > encoderData[INDEX_ENCODER_Y].pastSpeed)
+        {
+            TF_y = encoderData[INDEX_ENCODER_Y].pastSpeed;
+        }*/
+
+        //drive motor
+        encoderData[INDEX_ENCODER_X].pastSpeed = ePWM1dutyCtl((int16) TF_x);
+        encoderData[INDEX_ENCODER_Y].pastSpeed = ePWM2dutyCtl((int16) TF_y);
+    }
+
+    return ret;
+}
+
+//*************************************************************************
+// Function: blockSorting
+// - this function move TCP to the correct sylos to drop the block
+//
+// Arguments: PIXY_CCC *blocks
+// \e blocks store the signature information to decide where to go
+//
+//
+// return: 1 if block sucessfully drop
+// Author: Will Nguyen
+// Date: April 28th, 2023
+// Modified: May 5th, 2023
+//************************************************************************
+int16 blockSorting(PIXY_CCC *blocks)
+{
+    //reset flag use in this section
+    babyItsReady &= ~PLC_DONE;
+    //local var
+    int16 ret = 0;
+
+    //suck block
+    GET_BLOCK;
+
+    //wait for PLC to secure the block
+    WAIT_FOR_PLC_PICK_UP;
+
+    //enable T1 interrupt
+    DINT;
+    ENABLE_INTERRUPT_T1;
+    EINT;
+
+    switch (blocks->signature)
+    {
+    case 1:
+        ret = cartesianCoordMove(DROP_SIG1_X, DROP_SIG1_Y, ERROR_0125);
+        break;
+    case 2:
+        ret = cartesianCoordMove(DROP_SIG2_X, DROP_SIG2_Y, ERROR_0125);
+        break;
+    case 3:
+        ret = cartesianCoordMove(DROP_SIG3_X, DROP_SIG3_Y, ERROR_0125);
+        break;
+    }
+
+    //disable T1 interrupt
+    DINT;
+    DISABLE_INTERRUPT_T1;
+    EINT;
+
+    //release block
+    RELEASE_BLOCK;
+
+    //wait for PLC to release
+    WAIT_FOR_PLC_DROP;
 
     return ret;
 }
@@ -457,8 +602,7 @@ int16 controllerPID(PIXY_CCC *blocks)
 //************************************************************************
 int16 cartesianHome(void)
 {
-    int16 currSpeedX = 0;
-    int16 currSpeedY = 0;
+    int16 count = 0;
 
     //set direction
     HOME_DIR_X
@@ -468,39 +612,32 @@ int16 cartesianHome(void)
     ;
 
     //homing speed
-    currSpeedX = ePWM1dutyCtl(60);
-    currSpeedY = ePWM2dutyCtl(60);
+    ePWM1dutyCtl(60);
+    ePWM2dutyCtl(60);
 
     while (1)
     {
         //if reached home
-        if (babyItsReady & X_HOME_FLAG)
+        if (babyItsReady & DINNER)
         {
             //turn off flag
-            babyItsReady &= ~X_HOME_FLAG;
+            babyItsReady &= ~DINNER;
 
-            //switch de-bounce
-
-            //turn off motor
-            currSpeedX = ePWM1dutyCtl(SPEED_0);
-            if (currSpeedY == SPEED_0)
+            //if poscnt of both encoder stop increasing for 3 sec, arm is homed
+            if (encoderData[INDEX_ENCODER_X].posCnt
+                    == encoderData[INDEX_ENCODER_X].prePosCnt
+                    && encoderData[INDEX_ENCODER_Y].posCnt
+                            == encoderData[INDEX_ENCODER_Y].prePosCnt)
             {
-                break;
-            }
+                count++;
+                //if 3 second went by with out moving
+                if (count == TIME_OUT_3_SEC)
+                {
+                    ePWM1dutyCtl(SPEED_0);
+                    ePWM2dutyCtl(SPEED_0);
 
-        }
-        if (babyItsReady & Y_HOME_FLAG)
-        {
-            //turn off flag
-            babyItsReady &= ~Y_HOME_FLAG;
-
-            //switch de-bounce
-
-            //turn off motor
-            currSpeedY = ePWM2dutyCtl(SPEED_0);
-            if (currSpeedX == SPEED_0)
-            {
-                break;
+                    break;
+                }
             }
         }
     }
@@ -508,8 +645,8 @@ int16 cartesianHome(void)
 }
 
 //*************************************************************************
-// Function:xHomeISR
-// - interrupt handler for x axis reach home position
+// Function:plcDoneISR
+// - interrupt handler for plc communicate to microcontroller
 //
 // Arguments:
 //
@@ -517,33 +654,14 @@ int16 cartesianHome(void)
 // return: none
 // Author: Will Nguyen
 // Date: April 24th, 2023
-// Modified: April 24th, 2023
+// Modified: may 7th, 2023
 //************************************************************************
-__interrupt void xHomeISR(void)
+/*__interrupt void plcDoneISR(void)
 {
-    static int count;
-    babyItsReady |= X_HOME_FLAG;
-    count++;
+    babyItsReady |= PLC_DONE;
     Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP1);
-}
+}*/
 
-//*************************************************************************
-// Function:yHomeISR
-// - interrupt handler for y axis reach home position
-//
-// Arguments:
-//
-//
-// return: none
-// Author: Will Nguyen
-// Date: April 24th, 2023
-// Modified: April 24th, 2023
-//************************************************************************
-__interrupt void yHomeISR(void)
-{
-    babyItsReady |= Y_HOME_FLAG;
-    Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP1);
-}
 
 //*************************************************************************
 // Function: timer1ISR
@@ -555,7 +673,8 @@ __interrupt void yHomeISR(void)
 // Date: April 11th, 2023
 // Modified: April 11th, 2023
 //*************************************************************************
-__interrupt void timer1ISR(void)
+__interrupt
+void timer1ISR(void)
 {
     babyItsReady |= T1_INT;
 
@@ -576,11 +695,12 @@ __interrupt void timer1ISR(void)
 // Date: Mar 18th, 2023
 // Modified: Mar 18th, 2023
 //*************************************************************************
-__interrupt void eQEP1ISR(void)
+__interrupt
+void eQEP1ISR(void)
 {
     if (EQep1Regs.QFLG.bit.PCU == 1)
     {
-        babyItsReady |= UNDERFLOW;
+        babyItsReady |= EQEP1_UNDERFLOW;
         //clear interrupt flag
         EQep1Regs.QCLR.bit.PCU = 1;
     }
@@ -588,14 +708,19 @@ __interrupt void eQEP1ISR(void)
     //if there is a unit time out interrupt
     if (EQep1Regs.QFLG.bit.UTO == 1)
     {
+        babyItsReady |= DINNER;
         //update direction every time out event, is it good enough?
         encoderData[INDEX_ENCODER_X].dir = EQep1Regs.QEPSTS.bit.QDF;
+
+        //update previous count
+        encoderData[INDEX_ENCODER_X].prePosCnt =
+                encoderData[INDEX_ENCODER_X].posCnt;
 
         //if pos cnt not underflowing
         encoderData[INDEX_ENCODER_X].posCnt = EQep1Regs.QPOSLAT;
 
         //if pos cnt underflowing
-        if (babyItsReady & UNDERFLOW)
+        if (babyItsReady & EQEP1_UNDERFLOW)
         {
             encoderData[INDEX_ENCODER_X].posCnt = MAX_COUNT - EQep1Regs.QPOSLAT;
             //babyItsReady &= ~UNDERFLOW;
@@ -604,13 +729,63 @@ __interrupt void eQEP1ISR(void)
         //clear interrupt flag
         EQep1Regs.QCLR.bit.UTO = 1;
     }
-
-    //calculate displacement and update position
-    encoderData[INDEX_ENCODER_X].posCurr = LEAD_SCREW
-            * encoderData[INDEX_ENCODER_X].posCnt / ENCODER_MAX_COUNT_QUAD;
-
     //clear general interrupt flag
     EQep1Regs.QCLR.bit.INT = 1;
+
+    //issue PIE ack
+    Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP5);
+}
+
+//*************************************************************************
+// Function: eQEP3ISR
+// - interrupt handler for eQEP3 module
+//  this ISR set a flag whenever there is a UNIT TIME OUT EVENT, COUNTER OVERFLOW/
+//  UNDERFLOW. The math for finding posCnt change base on the flag.
+//
+// Arguments: none
+//
+// return: none
+// Author: Will Nguyen
+// Date: Mar 18th, 2023
+// Modified: May 3rd, 2023
+//*************************************************************************
+__interrupt
+void eQEP3ISR(void)
+{
+    if (EQep3Regs.QFLG.bit.PCU == 1)
+    {
+        babyItsReady |= EQEP3_UNDERFLOW;
+        //clear interrupt flag
+        EQep3Regs.QCLR.bit.PCU = 1;
+    }
+
+    //if there is a unit time out interrupt
+    if (EQep3Regs.QFLG.bit.UTO == 1)
+    {
+        babyItsReady |= DINNER;
+        //update direction every time out event, is it good enough?
+        encoderData[INDEX_ENCODER_Y].dir = EQep3Regs.QEPSTS.bit.QDF;
+
+        //update previous count
+        encoderData[INDEX_ENCODER_Y].prePosCnt =
+                encoderData[INDEX_ENCODER_Y].posCnt;
+
+        //if pos cnt not underflowing
+        encoderData[INDEX_ENCODER_Y].posCnt = EQep3Regs.QPOSLAT;
+
+        //if pos cnt underflowing
+        if (babyItsReady & EQEP3_UNDERFLOW)
+        {
+            encoderData[INDEX_ENCODER_Y].posCnt = MAX_COUNT - EQep3Regs.QPOSLAT;
+            //babyItsReady &= ~UNDERFLOW;
+        }
+
+        //clear interrupt flag
+        EQep3Regs.QCLR.bit.UTO = 1;
+    }
+
+    //clear general interrupt flag
+    EQep3Regs.QCLR.bit.INT = 1;
 
     //issue PIE ack
     Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP5);
