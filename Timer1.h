@@ -18,7 +18,7 @@
 //************************************************************************
 //TIME0 FREQUENCY
 #define SYS_CLK_FREQ 100000000
-#define T1_FREQ 30
+#define T1_FREQ 20
 //************************************************************************
 //MACROS
 #define CLEAR_T1_INT_FLAG CpuTimer1Regs.TCR.bit.TIF = 1

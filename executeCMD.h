@@ -24,21 +24,23 @@
 //*************************************************************************
 //PRE-DEFINE CONSTANT
 //PI CONTROLLER
-#define P_CONTROLLER_X 1/TARGET_X
-#define P_CONTROLLER_Y 1/TARGET_Y
-#define I_CONTROLLER_X 0.5
-#define I_CONTROLLER_Y 0.5
+#define P_CONTROLLER_X 25
+#define P_CONTROLLER_Y 25
+#define I_CONTROLLER_X 0.4
+#define I_CONTROLLER_Y 0.4
+#define D_CONTROLLER_X 0.3
+#define D_CONTROLLER_Y 0.3
 //USER HOME
-#define USER_HOME_X 2.7
-#define USER_HOME_Y 5.5
+#define USER_HOME_X 2.5
+#define USER_HOME_Y 6.5
 //DROP SIGNATURE 1
-#define DROP_SIG1_X 7.2
-#define DROP_SIG1_Y 1.5
+#define DROP_SIG1_X 7.4
+#define DROP_SIG1_Y 2
 //DROP SIGNATURE 2
-#define DROP_SIG2_X 7.2
-#define DROP_SIG2_Y 4
+#define DROP_SIG2_X 7.4
+#define DROP_SIG2_Y 4.35
 //DROP SIGNATURE 3
-#define DROP_SIG3_X 7.2
+#define DROP_SIG3_X 7.4
 #define DROP_SIG3_Y 7.05
 //TIME OUT FOR HOME
 #define TIME_OUT_3_SEC 300

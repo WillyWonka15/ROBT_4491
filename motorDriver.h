@@ -32,8 +32,8 @@
 #define FORWARD_DIR_Y CW_DIR_Y
 //*************************************************************************
 //DEFINE_FLAG
-#define X_HOME_FLAG C28X_BIT0
-#define Y_HOME_FLAG C28X_BIT1
+#define X_HOME_FLAG C28X_BIT5
+#define Y_HOME_FLAG C28X_BIT6
 //*************************************************************************
 
 //*************************************************************************
@@ -62,7 +62,7 @@ void motorDriverInit();
 // Date: April 24th, 2023
 // Modified: April 24th, 2023
 //************************************************************************
-__interrupt void xHomeISR(void);
+//__interrupt void xHomeISR(void);
 
 //*************************************************************************
 // Function:yHomeISR
@@ -76,6 +76,6 @@ __interrupt void xHomeISR(void);
 // Date: April 24th, 2023
 // Modified: April 24th, 2023
 //************************************************************************
-__interrupt void yHomeISR(void);
+//__interrupt void yHomeISR(void);
 
 #endif /* MOTORDRIVER_H_ */

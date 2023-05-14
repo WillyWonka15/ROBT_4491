@@ -47,8 +47,8 @@
 #define SIGNATURE_7 C28X_BIT6
 //************************************************************************
 //MIDDLE POINT OF THE PIXYCAM
-#define TARGET_X 151
-#define TARGET_Y 203
+#define TARGET_X 165
+#define TARGET_Y 198
 //************************************************************************
 //STRUCTURE
 typedef struct PIXY_CCC

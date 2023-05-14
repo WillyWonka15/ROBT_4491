@@ -54,21 +54,23 @@ void motorDriverInit()
     GPIO_setDirectionMode(GPIO_Y_DIR_CW, GPIO_DIR_MODE_OUT);
 
     //GPIO for limit switch to home x
-    GPIO_setMasterCore(GPIO_X_HOME, GPIO_CORE_CPU1);
+    /*GPIO_setMasterCore(GPIO_X_HOME, GPIO_CORE_CPU1);
     GPIO_setPinConfig(GPIO_130_GPIO130);
     GPIO_setDirectionMode(GPIO_X_HOME, GPIO_DIR_MODE_IN);
+    GPIO_setPadConfig(GPIO_X_HOME, GPIO_PIN_TYPE_PULLUP);*/
 
     //set up interrupt on the falling edge
-    Interrupt_register(INT_XINT1, &xHomeISR);
+    /*Interrupt_register(INT_XINT1, &xHomeISR);
     GPIO_setInterruptPin(GPIO_X_HOME, GPIO_INT_XINT1);
-    GPIO_setInterruptType(GPIO_X_HOME, GPIO_INT_TYPE_FALLING_EDGE);
+    GPIO_setInterruptType(GPIO_X_HOME, GPIO_INT_TYPE_RISING_EDGE);
     GPIO_enableInterrupt(GPIO_INT_XINT1);
-    Interrupt_enable(INT_XINT1);
+    Interrupt_enable(INT_XINT1);*/
 
     //GPIO for limit switch to home y
-    GPIO_setMasterCore(GPIO_Y_HOME, GPIO_CORE_CPU1);
+    /*GPIO_setMasterCore(GPIO_Y_HOME, GPIO_CORE_CPU1);
     GPIO_setPinConfig(GPIO_26_GPIO26);
     GPIO_setDirectionMode(GPIO_Y_HOME, GPIO_DIR_MODE_IN);
+    GPIO_setPadConfig(GPIO_Y_HOME, GPIO_PIN_TYPE_PULLUP);
 
     //set up output pin to the limit switch
     GPIO_setMasterCore(125, GPIO_CORE_CPU1);
@@ -79,16 +81,16 @@ void motorDriverInit()
     GPIO_setPinConfig(GPIO_29_GPIO29);
     GPIO_setDirectionMode(29, GPIO_DIR_MODE_OUT);
 
-    //set both to high
-    GpioDataRegs.GPASET.bit.GPIO29 = 1;
-    GpioDataRegs.GPDSET.bit.GPIO125 = 1;
+    //set both to low
+    GpioDataRegs.GPACLEAR.bit.GPIO29 = 1;
+    GpioDataRegs.GPDCLEAR.bit.GPIO125 = 1;
 
     //set up interrupt on the falling edge
     Interrupt_register(INT_XINT2, &yHomeISR);
     GPIO_setInterruptPin(GPIO_Y_HOME, GPIO_INT_XINT2);
-    GPIO_setInterruptType(GPIO_Y_HOME,GPIO_INT_TYPE_FALLING_EDGE);
+    GPIO_setInterruptType(GPIO_Y_HOME,GPIO_INT_TYPE_RISING_EDGE);
     GPIO_enableInterrupt(GPIO_INT_XINT2);
-    Interrupt_enable(INT_XINT2);
+    Interrupt_enable(INT_XINT2);*/
 
     //default CCW
     CCW_DIR_Y;

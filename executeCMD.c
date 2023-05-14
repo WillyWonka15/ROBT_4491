@@ -446,8 +446,12 @@ int16 controllerPID(float32 error, float32 a)
 {
     static float32 eiX = 0;
     static float32 eiY = 0;
-    static float32 I_x = 0;
-    static float32 I_y = 0;
+    static float32 lasteX = 0;
+    static float32 lasteY = 0;
+    float32 I_x = 0;
+    float32 I_y = 0;
+    static float32 eX = 0;
+    static float32 eY = 0;
     float32 TF_x = 0;
     float32 TF_y = 0;
 
@@ -458,25 +462,39 @@ int16 controllerPID(float32 error, float32 a)
         a = 1;
     }
 
-    //determine direction and P
-    float32 eX = encoderData[INDEX_ENCODER_X].posDesire
+    //P
+    lasteX = eX;
+    lasteY = eY;
+
+    eX = encoderData[INDEX_ENCODER_X].posDesire
             - encoderData[INDEX_ENCODER_X].posCurr;
 
-    float32 eY = encoderData[INDEX_ENCODER_Y].posDesire
+    eY = encoderData[INDEX_ENCODER_Y].posDesire
             - encoderData[INDEX_ENCODER_Y].posCurr;
 
-    int32 P_x = abs(eX * a * 100 / encoderData[INDEX_ENCODER_X].displacement);
-    int32 P_y = abs(eY * a *  100 / encoderData[INDEX_ENCODER_Y].displacement);
+    float32 P_x = P_CONTROLLER_X * eX * a;
+    float32 P_y = P_CONTROLLER_Y * eY * a;
 
     //I
-    eiX += eX*eX;
-    eiY += eY*eY;
+    eiX += eX;
+    eiY += eY;
+
+    //reset from wind up
+    if(eX * lasteX < 0)
+    {
+        eiX = 0;
+    }
+    if(eY * lasteY < 0)
+    {
+        eiY = 0;
+    }
+
     I_x = I_CONTROLLER_X * eiX;
     I_y = I_CONTROLLER_Y * eiY;
 
     //transfer function
-    TF_x = P_x + I_x;
-    TF_y = P_y + I_x;
+    TF_x = 100*(P_x + I_x);
+    TF_y = 100*(P_y + I_y);
     //stop if on the target, maybe using displacement is too slow
     if ((eX * eX < error) && (eY * eY < error))
     {
@@ -511,16 +529,14 @@ int16 controllerPID(float32 error, float32 a)
             ;
         }
 
-        //filter any jump of error
-
-        /*if (TF_x > encoderData[INDEX_ENCODER_X].pastSpeed)
+        if(TF_x * TF_x > 10000)
         {
-            TF_x = encoderData[INDEX_ENCODER_X].pastSpeed;
+            TF_x = 100;
         }
-        if (TF_y > encoderData[INDEX_ENCODER_Y].pastSpeed)
+        if(TF_y * TF_y > 10000)
         {
-            TF_y = encoderData[INDEX_ENCODER_Y].pastSpeed;
-        }*/
+            TF_y = 100;
+        }
 
         //drive motor
         encoderData[INDEX_ENCODER_X].pastSpeed = ePWM1dutyCtl((int16) TF_x);
@@ -557,9 +573,9 @@ int16 blockSorting(PIXY_CCC *blocks)
     WAIT_FOR_PLC_PICK_UP;
 
     //enable T1 interrupt
-    DINT;
+    /*DINT;
     ENABLE_INTERRUPT_T1;
-    EINT;
+    EINT;*/
 
     switch (blocks->signature)
     {
@@ -575,9 +591,9 @@ int16 blockSorting(PIXY_CCC *blocks)
     }
 
     //disable T1 interrupt
-    DINT;
+    /*DINT;
     DISABLE_INTERRUPT_T1;
-    EINT;
+    EINT;*/
 
     //release block
     RELEASE_BLOCK;

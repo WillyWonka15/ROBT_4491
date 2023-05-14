@@ -144,7 +144,7 @@ unsigned char usciSCIgets(unsigned char *rxStr)
     unsigned char ret;
 
     //while enter key is not being hit
-    while(ScibRegs.SCIRXBUF.bit.SAR != 0x0d)
+     while(ScibRegs.SCIRXBUF.bit.SAR != 0x0d)
     {
         //poll RX flag
         WAIT_FOR_SCI_RX;

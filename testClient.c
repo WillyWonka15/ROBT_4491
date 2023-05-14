@@ -26,14 +26,13 @@ void main(void)
     int16 ret;
 
     ////initialize section
+    //initialize device
+    Device_init();
 
     //initialize interrupt module
     Interrupt_initModule();
     Interrupt_enablePIE();
     Interrupt_initVectorTable();
-
-    //initialize device
-    Device_init();
 
     //initialize SCI module
     usciSCIBinit(DISABLE_LOOPBACK);
@@ -51,7 +50,8 @@ void main(void)
     motorDriverInit();
 
     //encoder data capture
-    eQEP1init(DISABLE_INTERRUPT);
+    eQEP1init(ENABLE_INTERRUPT);
+    eQEP3init(ENABLE_INTERRUPT);
 
     //intialize struc CMD
     cmdInitialize(cmdList);
@@ -59,15 +59,12 @@ void main(void)
     //make sure watch dog are disable
     SysCtl_disableWatchdog();
 
+    //
+    communicationInit();
+
+
     //turn on global interrupt
     EINT;
-
-    //
-    EALLOW;
-    GPIO_disableInterrupt(GPIO_INT_XINT1);
-    GPIO_disableInterrupt(GPIO_INT_XINT2);
-    EDIS;
-
 
     //pin to test interrupt frequency
     GPIO_setMasterCore(15, GPIO_CORE_CPU1);
@@ -78,13 +75,6 @@ void main(void)
     ePWM1dutyCtl(SPEED_0);
     ePWM2dutyCtl(SPEED_0);
 
-
-    //test loop for limit switch
-    /*while(1)
-    {
-        executeCmd(cmdList, INDEX_HOME);
-        for(;;);
-    }*/
 
     while (1)
     {

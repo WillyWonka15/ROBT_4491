@@ -65,7 +65,7 @@ int16 pixyTargetRequest(PIXY_CCC *blocks)
     usciSPIrxStr(resPacket, RES_PACKET_LEN);
 
     //store data into struct, make into a function
-    if ((int16)resPacket[PAYLOAD_LEN_INDEX] == RES_PAYLOAD_LEN)
+    if ((int16) resPacket[PAYLOAD_LEN_INDEX] == RES_PAYLOAD_LEN)
     {
         blocks->m_x = resPacket[M_X_INDEX_HI] << 8 | resPacket[M_X_INDEX_LO];
 
@@ -105,14 +105,38 @@ int16 pixyCamGetBlocks(PIXY_CCC *blocks, int numBlock)
 {
     //
     int16 ret;
+    unsigned char signature;
+    switch (blocks->signature)
+    {
+    case 1:
+        signature = SIGNATURE_1;
+        break;
+    case 2:
+        signature = SIGNATURE_2;
+        break;
+    case 3:
+        signature = SIGNATURE_3;
+        break;
+    case 4:
+        signature = SIGNATURE_4;
+        break;
+    case 5:
+        signature = SIGNATURE_5;
+        break;
+    case 6:
+        signature = SIGNATURE_6;
+        break;
+    case 7:
+        signature = SIGNATURE_7;
+        break;
+    }
 
     //array contain the detected signature value
     unsigned char reqPacket[REQ_PACKET_LEN] = { SYNC_16_HI, SYNC_16_LO,
     PACKET_TYPE,
-                                                PAYLOAD_LEN,
-                                                blocks->signature,
-                                                numBlock, 0, 0, 0, 0,
-                                                0, 0, 0 };
+                                                PAYLOAD_LEN, signature,
+                                                numBlock, 0, 0, 0, 0, 0, 0, 0 };
+
     //array to store respond
     unsigned char resPacket[RES_PACKET_LEN];
 
@@ -123,9 +147,9 @@ int16 pixyCamGetBlocks(PIXY_CCC *blocks, int numBlock)
     usciSPIrxStr(resPacket, RES_PACKET_LEN);
 
     //if the signature is the same and the track index match
-    if ((int16) resPacket[SIG_INDEX] == blocks->signature && (int16)resPacket[TRACKING_INDEX] == blocks->trackIndex)
+    if ((int16) resPacket[SIG_INDEX] == blocks->signature
+            && (int16) resPacket[TRACKING_INDEX] == blocks->trackIndex)
     {
-        ret = 0;
         blocks->m_x = (int16) resPacket[M_X_INDEX_HI] << 8
                 | resPacket[M_X_INDEX_LO];
 

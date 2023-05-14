@@ -26,8 +26,8 @@
 //************************************************************************
 //INTERRUPT HANDLING BIT
 #define DINNER C28X_BIT0
-#define OVERFLOW C28X_BIT1
-#define UNDERFLOW C28X_BIT2
+#define EQEP1_UNDERFLOW C28X_BIT2
+#define EQEP3_UNDERFLOW C28X_BIT1
 //************************************************************************
 //INTERRUPT
 #define ENABLE_INTERRUPT 1
@@ -50,13 +50,19 @@
 //eQEP pin-out
 #define EQEP1_GPIO_A 10
 #define EQEP1_GPIO_B 11
+#define EQEP3_GPIO_A 6
+#define EQEP3_GPIO_B 7
 //************************************************************************
 //STRUCTURE
 typedef struct ENC_DAT
 {
-     volatile float64 posCurr; //store current count
-     volatile int32 posCnt;  //store the count elapse over every Ttout
+     volatile float32 posCurr; //store current count
+     volatile unsigned long int posCnt;  //store the count elapse over every Ttout
+     volatile unsigned long int prePosCnt;  //store the previous count
      volatile int16 dir; //store direction of flywheel
+     volatile int16 pastSpeed; //store the last speed motor was running at
+     volatile float32 posDesire; //store the distance you need to travel to get to the block
+     volatile float32 displacement; //store the distance you need to travel to get to the block
 }ENC_DAT;
 
 enum ENC_LIST_INDEX
@@ -80,6 +86,20 @@ enum ENC_LIST_INDEX
 // Modified: Mar 18th, 2023
 //************************************************************************
 void eQEP1init(int16 enableInt);
+
+//*************************************************************************
+// Function: eQEP3init
+// - initialize the eQEP3 module for measuring the count of an encoder per unit time
+// out interval, eQEP1 is dedicate for x-axis motor
+//
+// Arguments: int16_t enableInt
+//
+// return: none
+// Author: Will Nguyen
+// Date: Mar 18th, 2023
+// Modified: May 3rd, 2023
+//************************************************************************
+void eQEP3init(int16 enableInt);
 
 //*************************************************************************
 // Function: encoderDataInit
@@ -109,6 +129,20 @@ void encoderDataInit(ENC_DAT *encoder);
 void eQEP1GPIOinit(void);
 
 //*************************************************************************
+// Function: eQEP3GPIOinit
+// - initialize GPIO pin for eQEP3 module
+// GPIO 6 is dedicate for channel A
+// GPIO 7 is dedicate for channel B
+// Arguments:none
+//
+// return: none
+// Author: Will Nguyen
+// Date: Mar 18th, 2023
+// Modified: May 3rd, 2023
+//*************************************************************************
+void eQEP3GPIOinit(void);
+
+//*************************************************************************
 // Function: eQEP1initInit
 // - initialize the interrupt for eQEP1
 //  unit time out interrupt
@@ -124,6 +158,21 @@ void eQEP1GPIOinit(void);
 void eQEP1intInit(void);
 
 //*************************************************************************
+// Function: eQEP3initInit
+// - initialize the interrupt for eQEP3
+//  unit time out interrupt
+//  position counter overflow interrupt
+//  position counter underflow interrupt
+// Arguments:
+//
+// return: none
+// Author: Will Nguyen
+// Date: Mar 18th, 2023
+// Modified: May 3rd, 2023
+//*************************************************************************
+void eQEP3intInit(void);
+
+//*************************************************************************
 // Function: eQEP1ISR
 // - interrupt handler for eQEP1 unit timeout event
 // Arguments:
@@ -134,5 +183,17 @@ void eQEP1intInit(void);
 // Modified: Mar 18th, 2023
 //*************************************************************************
 __interrupt void eQEP1ISR(void);
+
+//*************************************************************************
+// Function: eQEP3ISR
+// - interrupt handler for eQEP3 unit timeout event
+// Arguments:
+//
+// return: none
+// Author: Will Nguyen
+// Date: Mar 18th, 2023
+// Modified: May 3rd, 2023
+//*************************************************************************
+__interrupt void eQEP3ISR(void);
 
 #endif /* ENCODERDATACAPTURE_H_ */
